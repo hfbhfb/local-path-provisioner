@@ -15,8 +15,8 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -375,7 +375,8 @@ func (p *LocalPathProvisioner) provisionFor(opts pvController.ProvisionOptions, 
 		}
 	}
 
-	path := filepath.Join(basePath, folderName)
+	// path := filepath.Join(basePath, folderName)
+	path := basePath + "/" + folderName
 	if nodeName == "" {
 		logrus.Infof("Creating volume %v at %v", name, path)
 	} else {
@@ -583,10 +584,10 @@ func (p *LocalPathProvisioner) createHelperPod(action ActionType, cmd []string, 
 	if o.Name == "" || o.Path == "" || (!sharedFS && o.Node == "") {
 		return fmt.Errorf("invalid empty name or path or node")
 	}
-	if !filepath.IsAbs(o.Path) {
-		return fmt.Errorf("volume path %s is not absolute", o.Path)
-	}
-	o.Path = filepath.Clean(o.Path)
+	// if !filepath.IsAbs(o.Path) {
+	// 	return fmt.Errorf("volume path %s is not absolute", o.Path)
+	// }
+	// o.Path = filepath.Clean(o.Path)
 	parentDir, volumeDir := filepath.Split(o.Path)
 	hostPathType := v1.HostPathDirectoryOrCreate
 	lpvVolumes := []v1.Volume{
@@ -605,7 +606,7 @@ func (p *LocalPathProvisioner) createHelperPod(action ActionType, cmd []string, 
 			Operator: v1.TolerationOpExists,
 		},
 	}
-	helperPod := p.helperPod.DeepCopy()
+	helperPod := p.helperPod.DeepCopy() // tag
 
 	keyToPathItems := make([]v1.KeyToPath, 0, 2)
 
@@ -644,12 +645,14 @@ func (p *LocalPathProvisioner) createHelperPod(action ActionType, cmd []string, 
 	parentDir = dataMount.MountPath
 	parentDir = strings.TrimSuffix(parentDir, string(filepath.Separator))
 	volumeDir = strings.TrimSuffix(volumeDir, string(filepath.Separator))
-	if parentDir == "" || volumeDir == "" || !filepath.IsAbs(parentDir) {
-		// it covers the `/` case
-		return fmt.Errorf("invalid path %v for %v: cannot find parent dir or volume dir or parent dir is relative", action, o.Path)
-	}
+	// if parentDir == "" || volumeDir == "" || !filepath.IsAbs(parentDir) {
+	// 	// it covers the `/` case
+	// 	return fmt.Errorf("invalid path %v for %v: cannot find parent dir or volume dir or parent dir is relative", action, o.Path)
+	// }
+
+	strPath := parentDir + "/" + volumeDir
 	env := []v1.EnvVar{
-		{Name: envVolDir, Value: filepath.Join(parentDir, volumeDir)},
+		{Name: envVolDir, Value: strPath},
 		{Name: envVolMode, Value: string(o.Mode)},
 		{Name: envVolSize, Value: strconv.FormatInt(o.SizeInBytes, 10)},
 	}
@@ -670,7 +673,7 @@ func (p *LocalPathProvisioner) createHelperPod(action ActionType, cmd []string, 
 	helperPod.Spec.Volumes = append(helperPod.Spec.Volumes, lpvVolumes...)
 	helperPod.Spec.Containers[0].Command = cmd
 	helperPod.Spec.Containers[0].Env = append(helperPod.Spec.Containers[0].Env, env...)
-	helperPod.Spec.Containers[0].Args = []string{"-p", filepath.Join(parentDir, volumeDir),
+	helperPod.Spec.Containers[0].Args = []string{"-p", strPath,
 		"-s", strconv.FormatInt(o.SizeInBytes, 10),
 		"-m", string(o.Mode),
 		"-a", string(action)}
@@ -808,10 +811,11 @@ func canonicalizeStorageClassConfig(data *StorageClassConfigData) (cfg *StorageC
 			if p[0] != '/' {
 				return nil, fmt.Errorf("path must start with / for path %v on node %v", p, n.Node)
 			}
-			path, err := filepath.Abs(p)
-			if err != nil {
-				return nil, err
-			}
+			// path, err := filepath.Abs(p)
+			// if err != nil {
+			// 	return nil, err
+			// }
+			path := p
 			if path == "/" {
 				return nil, fmt.Errorf("cannot use root ('/') as path on node %v", n.Node)
 			}

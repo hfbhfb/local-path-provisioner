@@ -31,8 +31,15 @@ kubectl apply -f examples/pod/pod.yaml
 
 kubectl get po 
 kubectl get pvc 
+kubectl get pv
+
+kubectl get pvc local-path-pvc -o yaml > test-yamls/pvc.yaml
+kubectl get pv pvc-93b78af6-f239-4f4f-a92d-f9eb80d041c7 -o yaml > test-yamls/pv.yaml
+ 
 
 
 
+# 
+kubectl apply -f deploy/local-path-storage.yaml
 
 
